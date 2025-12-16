@@ -1,0 +1,34 @@
+# Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE
+.idea
+.vscode
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.DS_Store
+*.iml
+*.ipr
+*.iws
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+*.env
+
+# Build files
+*.class
+*.jar
+*.war
+
+# Test
+**/target/test-classes/

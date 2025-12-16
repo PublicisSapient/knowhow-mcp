@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with pgvector
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: knowhow-postgres
+    environment:
+      POSTGRES_DB: chatbot_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - knowhow-network
+
+  # KnowHOW Backend Application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: knowhow-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      DB_URL: jdbc:postgresql://postgres:5432/chatbot_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+
+      # OpenAI/LLM Configuration
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://int.sapientslingsshot.com/v1}
+      OPENAI_MODEL_NAME: ${OPENAI_MODEL_NAME:-meta-llama/llama-3.3-70b-instruct}
+
+      # Confluence Configuration
+      CONFLUENCE_URL: ${CONFLUENCE_URL}
+      CONFLUENCE_USERNAME: ${CONFLUENCE_USERNAME}
+      CONFLUENCE_API_TOKEN: ${CONFLUENCE_API_TOKEN}
+      CONFLUENCE_SPACE_KEY: ${CONFLUENCE_SPACE_KEY}
+
+      # Email Configuration (Support)
+      SUPPORT_EMAIL_USERNAME: ${SUPPORT_EMAIL_USERNAME}
+      SUPPORT_EMAIL_PASSWORD: ${SUPPORT_EMAIL_PASSWORD}
+      SUPPORT_EMAIL_TO: ${SUPPORT_EMAIL_TO:-support@example.com}
+      SUPPORT_EMAIL_FROM: ${SUPPORT_EMAIL_FROM:-knowhow-assistant@example.com}
+
+      # Email Configuration (Error Notifications)
+      ERROR_EMAIL_ENABLED: ${ERROR_EMAIL_ENABLED:-true}
+      ERROR_EMAIL_TO: ${ERROR_EMAIL_TO:-admin@example.com}
+      ERROR_EMAIL_FROM: ${ERROR_EMAIL_FROM:-knowhow-errors@example.com}
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-production}
+
+      # Application Configuration
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+
+    ports:
+      - "8081:8081"
+    networks:
+      - knowhow-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081/mcp/api/actuator/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  knowhow-network:
+    driver: bridge
