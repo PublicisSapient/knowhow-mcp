@@ -15,7 +15,7 @@ USER spring:spring
 COPY target/*.jar app.jar
 
 # Expose port
-EXPOSE 8081
+EXPOSE 8085
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
