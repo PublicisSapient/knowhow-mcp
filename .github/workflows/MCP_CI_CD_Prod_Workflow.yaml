@@ -1,0 +1,116 @@
+name: MCP_CI_CD_Prod_Workflow
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Select Git tag (MCP)"
+        required: true
+        type: string
+        default: "14.0.0"
+
+      deploy:
+        description: 'Do you want to deploy after build?'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+env:
+  IMAGE_NAME: knowhow-mcp
+  ACR_NAME: ${{ secrets.SPEEDTOOLS_ACR_NAME }}
+  ACR_LOGIN_SERVER: ${{ secrets.SPEEDTOOLS_ACR_LOGIN_SERVER }}
+  BITBUCKET_HELM_REPO: ${{ secrets.SPEEDTOOLS_BITBUCKET_HELM_REPO }}
+  sonartoken: ${{ secrets.SONARQUBE_TOKEN }}
+  sonarurl: ${{ secrets.SONARURL }}
+  GITHUB_HEAD_NAME: $GITHUB_HEAD_REF
+  # 🔥 ArgoCD
+  ARGOCD_APP_NAME: knowhow-mcp-prod
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      argocd_app_name: ${{ env.ARGOCD_APP_NAME }}
+    steps:
+      - name: Set IMAGE_TAG and Values file for Prod
+        run: |
+          echo "IMAGE_TAG=${{ github.event.inputs.release_tag }}" >> $GITHUB_ENV
+          echo "VALUES_FILE=values-prod.yaml" >> $GITHUB_ENV
+
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.release_tag }}
+
+      - name: Set Up Java
+        uses: actions/setup-java@v2
+        with:
+          distribution: "adopt"
+          java-version: "17"
+
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Build knowhow-mcp
+        run: mvn clean install -Ddockerfile.skip=true
+
+      - name: Build & Push Docker Image
+        run: |
+          echo "Logging into ACR..."
+          docker login $ACR_LOGIN_SERVER --username ${{ secrets.SPEEDTOOLS_ACR_USERNAME }} --password ${{ secrets.SPEEDTOOLS_ACR_PASSWORD }}
+          echo "Building Docker image..."
+          docker build -t $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG .
+          echo "Pushing Docker image..."
+          docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Checkout Helm charts from Bitbucket
+        run: |
+          git clone ${{ secrets.SPEEDTOOLS_BITBUCKET_HELM_REPO }}
+          cd build-configurations/KnowHOW-Deploy/knowhow-mcp
+          yq -i ".image.tag = \"${IMAGE_TAG}\"" $VALUES_FILE
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add $VALUES_FILE
+          git diff --cached --quiet || git commit -m "Update image tag values to ${IMAGE_TAG}"
+          git push origin HEAD
+
+  deploy:
+    if: ${{ github.event.inputs.deploy == 'true' }}
+    runs-on: github-actions-self-hosted-runner
+    timeout-minutes: 15
+    needs: build
+    env:
+      ARGOCD_APP_NAME: ${{ needs.build.outputs.argocd_app_name }}
+    steps:
+      - name: Install ArgoCD CLI
+        run: |
+          export ARGO_PATH="$HOME/bin"
+          mkdir -p $ARGO_PATH
+          curl -sSL -o "$ARGO_PATH/argocd" \
+            https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x "$ARGO_PATH/argocd"
+          echo "$ARGO_PATH" >> $GITHUB_PATH
+
+      - name: ArgoCD CLI Login
+        run: |
+          argocd login argocd-server \
+            --username ${{ secrets.SPEEDTOOLS_ARGOCD_USERNAME}} \
+            --password ${{ secrets.SPEEDTOOLS_ARGOCD_PASSWORD }} \
+            --plaintext
+
+      - name: Sync application
+        id: sync-app
+        run: argocd app sync ${{ env.ARGOCD_APP_NAME }}
+
+      - name: Wait for application health
+        run: argocd app wait ${{ env.ARGOCD_APP_NAME }} --health --timeout 300
