@@ -12,7 +12,7 @@
 
     <groupId>com.publicissapient.knowhow</groupId>
     <artifactId>knowhow</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0-SNAPSHOT</version>
 
     <name>knowhow</name>
     <description>Chatbot with Confluence Integration</description>
@@ -22,7 +22,7 @@
         <connection>scm:git:https://github.com/PublicisSapient/knowhow-mcp.git</connection>
         <developerConnection>scm:git:https://github.com/PublicisSapient/knowhow-mcp.git</developerConnection>
         <url>https://github.com/PublicisSapient/knowhow-mcp</url>
-        <tag>1.0.0</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <properties>
