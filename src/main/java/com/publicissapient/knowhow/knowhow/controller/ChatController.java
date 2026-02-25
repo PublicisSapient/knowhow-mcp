@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/chat")
-@CrossOrigin(origins = "http://localhost:4200") // Restrict to Angular frontend
+//@CrossOrigin(origins = "http://localhost:4200") // Restrict to Angular frontend
 public class ChatController {
 
     @Autowired
