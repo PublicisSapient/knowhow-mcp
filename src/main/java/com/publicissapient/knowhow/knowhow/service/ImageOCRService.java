@@ -36,6 +36,9 @@ public class ImageOCRService {
     @Value("${langchain4j.open-ai.chat-model.base-url}")
     private String baseUrl;
 
+    @Value("${langchain4j.open-ai.chat-model.model-name}")
+    private String modelName;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     /**
@@ -66,7 +69,7 @@ public class ImageOCRService {
             headers.setBearerAuth(openAiApiKey);
 
             Map<String, Object> requestBody = Map.of(
-                    "model", "gpt-4-turbo",
+                    "model", modelName,
                     "messages", List.of(
                             Map.of(
                                     "role", "user",
