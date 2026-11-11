@@ -418,3 +418,11 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Local environment config: keep out of commits
+*-dev.properties
+*-dev.yml
+*-dev.yaml
+*-local.properties
+*-local.yml
+*-local.yaml
